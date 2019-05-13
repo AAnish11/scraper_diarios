@@ -45,6 +45,7 @@ function limpiarHtml(html,wantsText) {
 		$('script').remove();
 		$('.newsletter-embeb').remove();
 		$('.ad-slot').remove();
+		$('.content-new').remove();
 		return (wantsText ? $.text() : $.html());
 	}
 	catch (ex) {
@@ -77,10 +78,44 @@ function leerOBajar(href, cbDespues) { //U: leer si tenemos y sino bajar y guard
 			}
 			else {
 				console.log("leerOBajar LEIDA",href);
-				cbDespues(href, {'$': Cheerio.load(data)}, fNop);
+				cbDespues(href, {options: {uri: href}, '$': Cheerio.load(data)}, fNop);
 			}
 		});
 	}
+}
+
+function bajarGoogle(q, p) {
+	leerOBajar(
+		'https://www.google.com/search?q='+q+'&start='+(p*10),
+		procesarGoogle
+	);
+}
+
+function procesarGoogle(href, res, done) {
+	var $= res.$;
+	var l= $('a')
+	l.map( (i,e) => { 
+		var notaLink= $(e).attr('href'); 
+		var m= (notaLink.match(/q=([^&]+)/)||['','']);
+		var i= m[1].indexOf(BaseHRef);
+		if (i==0) {
+			console.log("GOOGLE LINK",i, m[1], notaLink);
+			bajarNota(m[1]);
+		}
+	});
+
+	var gl= $('.fl').last().attr('href');
+	console.log("GOOGLE NEXT",gl);
+	if (gl) {
+		var q= gl.match(/q=([^&]+)/);
+		var s= gl.match(/start=([^&]+)/);
+		var s_actual= res.options.uri.match(/start=([^&]+)/);
+		if (s_actual< s) {
+			bajarGoogle(q[1],s[1]/10);
+		}
+	}
+
+	done();
 }
 
 function bajarTema(tema) { //U: baja las notas de un "tema" (lo que Clarin llama tema)
@@ -109,12 +144,14 @@ function bajarNota(href) { //U: baja UNA nota y la limpia
 
 function procesarNota(href, res, done) {
 	var r= {};
+	r.href= href;
+	r.fecha= ((res.$.html()).match(/publishtime"\s+content="([^T]+)/)||[])[1];
 	r.titulo= limpiarTxt( res.$('#title').text() );
 	r.bajada= limpiarTxt( res.$('.bajada').text() );
 	r.volanta= limpiarTxt( res.$('.volanta').text() );
 	r.cuerpo= limpiarTxt( res.$('.body-nota').html() )
 
-	var fname= OutDir+'/data/'+fnamePara(href);
+	var fname= OutDir+'/data/'+fnamePara(href.replace(/.html?$/i,'')+'.json');
 	asegurarDir(fname);
 	Fs.writeFileSync(
 		fname,	
@@ -125,5 +162,6 @@ function procesarNota(href, res, done) {
 
 //============================================================
 bajarTema('boleta-unica');
+bajarTema('voto-electronico');
 
-leerOBajar('https://www.google.com/search?q=site:clarin.com+%22voto+electronico%22&start=20',fNop);
+bajarGoogle('site:clarin.com+%22voto+electronico',0);
