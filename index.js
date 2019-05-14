@@ -51,6 +51,7 @@ function limpiarHtml(html,wantsText) {
 		$('.newsletter-embeb').remove();
 		$('.ad-slot').remove();
 		$('.content-new').remove();
+		$('.contenedor-video-fixed').remove();
 		return (wantsText ? $.text() : $.html());
 	}
 	catch (ex) {
@@ -97,15 +98,18 @@ function bajarGoogle(q, p) {
 }
 
 function procesarGoogle(href, res, done) {
+	var s_site= (res.options.uri.match(/site:([^&+]+)/)||[])[1]; //A: para encontrar links del site que estamos buscando
+
 	var $= res.$;
 	var l= $('a')
 	l.map( (i,e) => { 
 		var notaLink= $(e).attr('href'); 
-		var m= (notaLink.match(/q=([^&]+)/)||['','']);
-		var i= m[1].indexOf(BaseHRef);
-		if (i==0) {
-			console.log("GOOGLE LINK",i, m[1], notaLink);
-			bajarNota(m[1]);
+		var mq= (notaLink.match(/url\?q=([^&]+)/)||['','']);
+		var mdst= mq && mq[1].match(new RegExp('^https?://[\\w\\.-]*'+s_site));
+		//DBG console.log("GOOGLE LINK MATCH?",mdst,s_site,notaLink);
+		if (mdst) {
+			console.log("GOOGLE LINK",i, mq[1], notaLink);
+			bajarNota(mq[1]);
 		}
 	});
 
@@ -148,6 +152,15 @@ function bajarNota(href) { //U: baja UNA nota y la limpia
 }
 
 function procesarNota(href, res, done) {
+	if (href.indexOf("clarin.com")>-1) { procesarNotaClarin(href, res, done); }
+	else if (href.indexOf("lanacion")>-1) { procesarNotaLaNacion(href, res, done); }
+	else {
+		console.error("ERROR: procesarNota no defnido para", href);
+		done();
+	}
+}
+
+function procesarNotaClarin(href, res, done) {
 	var r= {};
 	r.href= href;
 	r.fecha= ((res.$.html()).match(/publishtime"\s+content="([^T]+)/)||[])[1];
@@ -165,8 +178,32 @@ function procesarNota(href, res, done) {
 	done();
 }
 
+function procesarNotaLaNacion(href, res, done) {
+	var r= {};
+	r.MEDIO= "lanacion";
+	r.href= href;
+	var fp= ((res.$.html()).match(/datePublished"\s*:\s*"(\d+).(\d+).(\d+)/))||[];
+	r.fecha= fp[3]+'-'+fp[2]+'-'+fp[1];
+	r.titulo= limpiarTxt( res.$('.titulo').text() );
+	r.bajada= limpiarTxt( res.$('.bajada').text() );
+	r.volanta= limpiarTxt( res.$('.volanta').text() );
+
+	var cp= []; res.$('#cuerpo p').map( (i,e) => cp.push( res.$(e).html() ) );
+	r.cuerpo= limpiarTxt( cp.join("\n") );
+
+	var fname= OutDir+'/data/'+fnamePara(href.replace(/.html?$/i,'')+'.json');
+	asegurarDir(fname);
+	Fs.writeFileSync(
+		fname,	
+		JSON.stringify(r,null,1)
+	);
+	done();
+}
+
+
 //============================================================
+bajarGoogle('site:lanacion.com.ar+%22voto+electronico',0);
+
 bajarTema('boleta-unica');
 bajarTema('voto-electronico');
-
 bajarGoogle('site:clarin.com+%22voto+electronico',0);
