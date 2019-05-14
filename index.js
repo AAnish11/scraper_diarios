@@ -1,5 +1,7 @@
 //INFO: bajar de clarin
 
+QuieroPathsSinCaracteresRaros= 1;
+
 OutDir= 'x_out';
 RawDir= OutDir+'/raw';
 
@@ -18,7 +20,10 @@ var crawler = new Crawler({
 Vista={}; //U: url -> si ya la pedimos
 
 function fnamePara(href) { //U: un path estandar para una url
-	return href.replace(/^https?:\/\//,'').replace(/:\d+/,'');
+	var r= href.replace(/^https?:\/\//,'').replace(/:\d+/,'');
+	return (QuieroPathsSinCaracteresRaros) ?
+		r.replace(/([^a-z0-9\.\/])/gi,function (x,c) { return '_'+c.charCodeAt(0).toString(16) })
+		: r;
 }
 
 function fnameRawPara(href) { //U: para guardar y leer lo que devolvio el server
